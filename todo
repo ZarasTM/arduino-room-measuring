@@ -1,0 +1,25 @@
+TODO:
+
+- mierzenie odległości podczas jazdy (obwód)
+- protokół tab[n][2] = {(x1, y1), (x2, y2), ..., (xn, yn)}
+- obliczenia (runtime):
+	- zapis protokołu
+	- położenie p = (x, y)
+	- odległość od p_zero = (0, 0)
+- obliczenia (end):
+	- powierzchnia
+	- generowanie mapy pokoju (img/ASCII)
+
+
+
+loop()
+	if(!wall_in_front && wall_on_right)
+		drive() // jedź i sprawdzaj czy prosto
+	else
+		stop()
+		saveToProtocol()
+		if(getDistFromZero() < xyz)
+			end()
+		restartCounters()
+		turnAndContinue()
+		
