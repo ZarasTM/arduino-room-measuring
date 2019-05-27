@@ -7,21 +7,23 @@
 #define ROT_PIN_RIGHT A1
 
 // Pins for sonar (HC-SR04)
-#define TRIG A4
-#define ECHO A5
+#define TRIG_R A2
+#define ECHO_R A3
 
-// Servo pin (has to be PWM)
-#define SERVO 3
+#define TRIG_F A4
+#define ECHO_F A5
 
 // Max and min values for event horizon
 #define HORIZON 200
-#define MIN_DIST 50
-#define MAX_DIST 100
+
+#define MIN_DIST_R 10
+#define MAX_DIST_R 30
+
+#define MIN_DIST_F 30
+#define MAX_DIST_F 0
 
 // Circut of weheels in milimeters
 #define CIRC 2125
-
-Servo serwo;
 
 Wheels w;
 
@@ -29,7 +31,7 @@ Wheels w;
 int speedL, speedR, speedAll;
 
 // Current distance returned by sonar
-int dist;
+int fDist, rDist;
 
 // Variables for stailizing ride
 volatile int lGap, rGap;
@@ -38,10 +40,10 @@ volatile int lGap, rGap;
 int lRot, rRot; // Rotations per second
 
 void setup() {
-  w.attach(9,8,10,6,7,5);
+  w.attach(6,7,5,9,8,10);
 
   // Set speed
-  speedAll = 255;
+  speedAll = 200;
   speedL = speedAll;
   speedR = speedAll;
 
@@ -49,7 +51,8 @@ void setup() {
   restartGaps();
   restartRot();
   
-  w.setSpeed(speedAll);
+  w.setSpeedRight(speedR);
+  w.setSpeedLeft(speedL);
   w.stop();
   
   // Interrupt pins
@@ -57,24 +60,27 @@ void setup() {
   pinMode(ROT_PIN_RIGHT, INPUT); 
 
   // Sonar pins
-  pinMode(TRIG, OUTPUT);    // TRIG starts sonar
-  pinMode(ECHO, INPUT);     // ECHO gets returning signal
-
-  serwo.attach(SERVO);
+  pinMode(TRIG_F, OUTPUT);    // TRIG starts sonar
+  pinMode(ECHO_F, INPUT);     // ECHO gets returning signal
   
-  serwo.write(90);
+  pinMode(TRIG_R, OUTPUT);
+  pinMode(ECHO_R, INPUT);
 
   Serial.begin(9600);
 
   attachPCINT(digitalPinToPCINT(ROT_PIN_LEFT), increment, CHANGE);
   attachPCINT(digitalPinToPCINT(ROT_PIN_RIGHT), increment, CHANGE);
+  delay(5000);
 }
 
 void loop() {
   checkPath();
-  Serial.print(rGap);
-  Serial.print(" ");  
-  Serial.println(lGap);
+  /*
+  Serial.print(lGap);
+  Serial.print(" ");
+  Serial.println(rGap);
+  restartGaps();
+  */
   delay(200);
 }
 
@@ -84,34 +90,56 @@ void increment(){
 }
 
 void checkPath(){
-  dist = lookAndTellDistance(90);
+  fDist = getDistF();
+  rDist = getDistR();
   
-  Serial.print("Distance = ");
-  Serial.println(dist);
-  
-  if(dist < MIN_DIST){
-    w.back();
-  }else if(dist > MAX_DIST && dist < HORIZON){
-    w.forward();
-  }else{
+  Serial.print("fDist: ");
+  Serial.print(fDist);
+  Serial.print("    rDist: ");
+  Serial.println(rDist);
+
+  if(fDist < MIN_DIST_F){
     w.stop();
+  }else{
+    w.forward();
+  }
+
+  // SetSpeedLeft should be dependant
+  if(rDist < MIN_DIST_R){
+    Serial.println("Changing L speed");
+    w.setSpeedLeft(100);
+  }else if(rDist > MAX_DIST_R){
+    Serial.println("Changing R speed");
+    w.setSpeedRight(100);
+  }else{
+    Serial.println("Restarting speed");
+    w.setSpeedRight(speedR);
+    w.setSpeedLeft(speedL);
   }
 }
 
-int lookAndTellDistance(byte angle) {
+int getDistF() {
   unsigned long tot;      // time of travel
   unsigned int distance;
-
-  serwo.write(angle);
   
-  if(angle != 90){
-    delay(500);
-  }
-  
-  digitalWrite(TRIG, HIGH);
+  digitalWrite(TRIG_F, HIGH);
   delay(10);
-  digitalWrite(TRIG, LOW);
-  tot = pulseIn(ECHO, HIGH);
+  digitalWrite(TRIG_F, LOW);
+  tot = pulseIn(ECHO_F, HIGH);
+
+  distance = tot/58;
+  
+  return distance;
+}
+
+int getDistR() {
+  unsigned long tot;      // time of travel
+  unsigned int distance;
+  
+  digitalWrite(TRIG_R, HIGH);
+  delay(10);
+  digitalWrite(TRIG_R, LOW);
+  tot = pulseIn(ECHO_R, HIGH);
 
   distance = tot/58;
   
