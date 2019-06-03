@@ -1,3 +1,4 @@
+// CAR NUMBER: 03
 #include <Servo.h>
 #include "Wheels.h"
 #include "PinChangeInterrupt.h"
@@ -7,8 +8,8 @@
 #define ROT_PIN_RIGHT A1
 
 // Pins for sonar (HC-SR04)
-#define TRIG_R A2
-#define ECHO_R A3
+#define TRIG_L A2
+#define ECHO_L A3
 
 #define TRIG_F A4
 #define ECHO_F A5
@@ -16,8 +17,9 @@
 // Max and min values for event horizon
 #define HORIZON 200
 
-#define MIN_DIST_R 10
-#define MAX_DIST_R 30
+#define MIN_DIST_L 10
+#define MAX_DIST_L 20
+#define MIN_TURN_DIST 100
 
 #define MIN_DIST_F 30
 #define MAX_DIST_F 0
@@ -31,7 +33,7 @@ Wheels w;
 int speedL, speedR, speedAll;
 
 // Current distance returned by sonar
-int fDist, rDist;
+int fDist, lDist;
 
 // Variables for stailizing ride
 volatile int lGap, rGap;
@@ -44,8 +46,8 @@ void setup() {
 
   // Set speed
   speedAll = 200;
-  speedL = speedAll;
-  speedR = speedAll;
+  speedL = 200;
+  speedR = 220;
 
   // Set gaps
   restartGaps();
@@ -63,25 +65,19 @@ void setup() {
   pinMode(TRIG_F, OUTPUT);    // TRIG starts sonar
   pinMode(ECHO_F, INPUT);     // ECHO gets returning signal
   
-  pinMode(TRIG_R, OUTPUT);
-  pinMode(ECHO_R, INPUT);
+  pinMode(TRIG_L, OUTPUT);
+  pinMode(ECHO_L, INPUT);
 
   Serial.begin(9600);
 
   attachPCINT(digitalPinToPCINT(ROT_PIN_LEFT), increment, CHANGE);
   attachPCINT(digitalPinToPCINT(ROT_PIN_RIGHT), increment, CHANGE);
-  delay(5000);
+  delay(1000);
 }
 
 void loop() {
   checkPath();
-  /*
-  Serial.print(lGap);
-  Serial.print(" ");
-  Serial.println(rGap);
-  restartGaps();
-  */
-  delay(200);
+  delay(150);
 }
 
 void increment(){
@@ -91,26 +87,47 @@ void increment(){
 
 void checkPath(){
   fDist = getDistF();
-  rDist = getDistR();
+  lDist = getDistL();
   
   Serial.print("fDist: ");
   Serial.print(fDist);
-  Serial.print("    rDist: ");
-  Serial.println(rDist);
+  Serial.print("    lDist: ");
+  Serial.println(lDist);
 
   if(fDist < MIN_DIST_F){
+    Serial.println("Turning right");
+    w.setSpeedRight(speedR);
+    w.setSpeedLeft(speedL);
+    w.stop();
+    w.forwardLeft();
+    delay(800);
     w.stop();
   }else{
     w.forward();
   }
 
+  int currSpeed;
   // SetSpeedLeft should be dependant
-  if(rDist < MIN_DIST_R){
-    Serial.println("Changing L speed");
-    w.setSpeedLeft(100);
-  }else if(rDist > MAX_DIST_R){
+  if(lDist < MIN_DIST_L){
     Serial.println("Changing R speed");
-    w.setSpeedRight(100);
+    w.setSpeedLeft(speedL);
+    currSpeed = speedR - 100;
+    w.setSpeedRight(currSpeed);
+  }else if(lDist > MIN_TURN_DIST){
+    Serial.println("Turning left");
+    w.setSpeedRight(speedR);
+    w.setSpeedLeft(speedL);
+    w.stop();
+    w.forwardRight();
+    delay(1000);
+    w.stop();
+    w.forward();
+    delay(500);
+  }else if(lDist > MAX_DIST_L){
+    Serial.println("Changing L speed");
+    w.setSpeedRight(240);
+    currSpeed = speedL - 130;
+    w.setSpeedLeft(currSpeed);
   }else{
     Serial.println("Restarting speed");
     w.setSpeedRight(speedR);
@@ -132,14 +149,14 @@ int getDistF() {
   return distance;
 }
 
-int getDistR() {
+int getDistL() {
   unsigned long tot;      // time of travel
   unsigned int distance;
   
-  digitalWrite(TRIG_R, HIGH);
+  digitalWrite(TRIG_L, HIGH);
   delay(10);
-  digitalWrite(TRIG_R, LOW);
-  tot = pulseIn(ECHO_R, HIGH);
+  digitalWrite(TRIG_L, LOW);
+  tot = pulseIn(ECHO_L, HIGH);
 
   distance = tot/58;
   
