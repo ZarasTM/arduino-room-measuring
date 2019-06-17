@@ -1,7 +1,9 @@
-// CAR NUMBER: 03
-#include <Servo.h>
+#include <SD.h>
 #include "Wheels.h"
 #include "PinChangeInterrupt.h"
+
+// Pin for microSD card adapter
+#define SD_PIN 4
 
 // Pins for rotations
 #define ROT_PIN_LEFT A0 
@@ -27,6 +29,7 @@
 // Circut of weheels in milimeters
 #define CIRC 2125
 
+File file;
 Wheels w;
 
 // Speed manipulation variables
@@ -37,9 +40,6 @@ int fDist, lDist;
 
 // Variables for stailizing ride
 volatile int lGap, rGap;
-
-// Variables for measuring distance
-int lRot, rRot; // Rotations per second
 
 void setup() {
   w.attach(6,7,5,9,8,10);
@@ -68,8 +68,15 @@ void setup() {
   pinMode(TRIG_L, OUTPUT);
   pinMode(ECHO_L, INPUT);
 
-  Serial.begin(9600);
+  pinMode(SD_PIN, OUTPUT);
+  if(!SD.begin(SD_PIN)){
+    Serial.println("Could not initialize SD card.");
+  }
 
+  SD.remove("out.txt");
+
+  Serial.begin(9600);
+  
   attachPCINT(digitalPinToPCINT(ROT_PIN_LEFT), increment, CHANGE);
   attachPCINT(digitalPinToPCINT(ROT_PIN_RIGHT), increment, CHANGE);
   delay(1000);
@@ -99,15 +106,15 @@ void checkPath(){
     w.setSpeedRight(speedR);
     w.setSpeedLeft(speedL);
     w.stop();
+    writeToAFile('R');
     w.forwardLeft();
     delay(800);
     w.stop();
   }else{
     w.forward();
   }
-
+  
   int currSpeed;
-  // SetSpeedLeft should be dependant
   if(lDist < MIN_DIST_L){
     Serial.println("Changing R speed");
     w.setSpeedLeft(speedL);
@@ -118,6 +125,7 @@ void checkPath(){
     w.setSpeedRight(speedR);
     w.setSpeedLeft(speedL);
     w.stop();
+    writeToAFile('L');
     w.forwardRight();
     delay(1000);
     w.stop();
@@ -161,6 +169,19 @@ int getDistL() {
   distance = tot/58;
   
   return distance;
+}
+
+void writeToAFile(char c){
+  file = SD.open("out.txt", FILE_WRITE);
+  if(file){
+    int len = (int)((double)((lGap + rGap)/2)/40)*CIRC;
+    file.print(len);
+    file.println(c);
+  }else{
+    Serial.println("Could not write to a file");
+  }
+  file.close();
+  restartGaps();
 }
 
 void restartGaps(){
